@@ -21,7 +21,7 @@
         packages.default = pkgs.unison.lib.buildFromTranscript {
           pname = "respend-utxo";
           version = "0.0.1";
-          compiledHash = "sha256-T5ZdgofzjJ+so0IRrpkW8oLgICB417MjvC+6hvff/Zc=";
+          compiledHash = "sha256-S9YNMGBrtuOcIXlkTW4sh5Yf/gEiB8B/SQcTZuN5CzA=";
           src = ./transaction-respender.md;
         };
 

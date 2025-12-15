@@ -37,13 +37,13 @@ greetingsOrSnapshotConfirmed
 -- Greetings
 
 type Greetings = {
-  chainSyncedStatus: Text
+  hydraVersion: Text
 }
 
 greetingsFromJson : '{Decoder} Greetings
 greetingsFromJson = do
-  chainSyncedStatus = at! "chainSyncedStatus" text
-  Greetings chainSyncedStatus
+  hydraVersion = at! "hydraNodeVersion" text
+  Greetings hydraVersion
 
 
 -- SnapshotConfirmed Envelope
