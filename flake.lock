@@ -1747,15 +1747,16 @@
         "unison": "unison"
       },
       "locked": {
-        "lastModified": 1764880271,
-        "narHash": "sha256-VDM2W5YFwd4N1Uz+XF5jPnGcL3xh3lmQpAzJqTMrTFc=",
-        "owner": "ceedubs",
+        "lastModified": 1765811870,
+        "narHash": "sha256-ZyAK6DPHLnMKhtzeYsrmRmDDA2cyowoRDdGdp+T4kgs=",
+        "owner": "noonio",
         "repo": "unison-nix",
-        "rev": "eda7404e3ea832f53ec445fd8cbb2b248e9e928d",
+        "rev": "7e635bd75bc682afb878b40e1e1bb92eff81c633",
         "type": "github"
       },
       "original": {
-        "owner": "ceedubs",
+        "owner": "noonio",
+        "ref": "transcript-with-src",
         "repo": "unison-nix",
         "type": "github"
       }

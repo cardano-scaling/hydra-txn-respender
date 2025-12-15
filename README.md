@@ -19,18 +19,13 @@ Then, with he demo environment from hydra-node:
 4. In one terminal, sign a new snapshot
 5. Observe many snapshots now signed!
 
-> [!Note]
->
-> At present, you will need to change the address in
-> `transaction-respender.md` if you wish to run it in a different envrionment.
-
-
 
 ### via Nix
 
 ```
 nix run .
 ```
+
 
 ### Hacking
 
@@ -60,10 +55,4 @@ in there a function to do the same respending over the HTTP endpoint (much
 slower, because we don't wait for Txn confirmations; so it submits failed
 Txns.)
 
-
-### Todo
-
-- [x] Keep both HTTP and WebSocket options
-- [x] Show how to use with `nix run .#demo`
-- [x] Unison dependencies
-- [x] Configuration of arguments
+Most of the code is now in `respend.u`, so you can hack there as you wish.

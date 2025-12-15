@@ -5,7 +5,10 @@
     # For cardano-cli to sign transactions
     cardano-node.url = "github:IntersectMBO/cardano-node/10.5.3";
     unison-nix = {
-      url = "github:ceedubs/unison-nix";
+      # url = "github:ceedubs/unison-nix";
+      # TODO: Replace with the above when
+      # https://github.com/ceedubs/unison-nix/pull/154 is merged.
+      url = "github:noonio/unison-nix/transcript-with-src";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -21,8 +24,9 @@
         packages.default = pkgs.unison.lib.buildFromTranscript {
           pname = "respend-utxo";
           version = "0.0.1";
-          compiledHash = "sha256-S9YNMGBrtuOcIXlkTW4sh5Yf/gEiB8B/SQcTZuN5CzA=";
-          src = ./transaction-respender.md;
+          compiledHash = "sha256-RAHVFdz+gOrQPpXdqzeOA1Tlms7d3uiDq2dUYgLbTGU=";
+          transcript = ./transaction-respender.md;
+          src = pkgs.lib.cleanSource ./.;
         };
 
         apps.default = flake-utils.lib.mkApp { drv = packages.default; };
