@@ -13,9 +13,8 @@ requires a transcript file to build a (reprodicble?!) derivation.
 
 > [!Note]
 >
-> Note that perhaps while this is reproducible, there are no library versions
-> pinned here. Nevertheless, the Nix hash in the flake.nix should at least
-> indicate if you are getting a different version to me.
+> We have pinned the library versions as best as possible to avoid getting new
+> versions that would break the hash.
 
 ## Json busywork
 
