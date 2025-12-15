@@ -2,18 +2,28 @@
 
 ### Usage
 
-With, say, the demo environment from hydra-node:
+First, you need the address that owns the UTxO you want to spend, and you need
+a file in this folder called `key.sk` that is capable of signing messages.
+
+I created this file by:
+
+```
+ln -s <hydra-path>/hydra-cluster/config/credentials/alice-funds.sk key.sk
+```
+
+Then, with he demo environment from hydra-node:
 
 1. `nix run github:cardano-scaling/hydra#demo`.
 2. Open all the terminals, init the head, have everyone commit some monies
-3. Run `ucm run.file respend.u ws.respendUtxo`
+3. Run `nix run . --  addr_test1vp5cxztpc6hep9ds7fjgmle3l225tk8ske3rmwr9adu0m6qchmx5z`
 4. In one terminal, sign a new snapshot
-5. Observe many snapshots now signed.
+5. Observe many snapshots now signed!
 
 > [!Note]
 >
 > At present, you will need to change the address in
 > `transaction-respender.md` if you wish to run it in a different envrionment.
+
 
 
 ### via Nix
@@ -51,4 +61,4 @@ Txns.)
 - [x] Keep both HTTP and WebSocket options
 - [x] Show how to use with `nix run .#demo`
 - [x] Unison dependencies
-- [ ] Configuration of arguments
+- [x] Configuration of arguments

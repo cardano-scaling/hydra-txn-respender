@@ -89,25 +89,14 @@ utxoFromJson = do
 > update
 ```
 
-## Arguments
-
-``` unison
--- Address that we will need to match on.
-myAddress = "addr_test1vp5cxztpc6hep9ds7fjgmle3l225tk8ske3rmwr9adu0m6qchmx5z"
-```
-
-``` ucm
-> update
-```
-
 ## Actual respending logic
 
 ``` unison
 -- | Actual respend logic using cardano-cli.
-computeRespendTx : Snapshot -> '{IO, Exception} Text
-computeRespendTx snapshot = do
+computeRespendTx : Text -> Snapshot -> '{IO, Exception} Text
+computeRespendTx owningAddress snapshot = do
   (utxoRef, utxo) =
-    (filter (cases (id, utxo) -> address utxo Text.== myAddress) (toList <| utxos snapshot))
+    (filter (cases (id, utxo) -> address utxo == owningAddress) (toList <| utxos snapshot))
       |> head
       |> getOrBug "Couldn't find a UTxO for you"
 
@@ -142,11 +131,12 @@ computeRespendTx snapshot = do
 > update
 ```
 
-## Respend via websock
+## Respend via websocket
 
 ``` unison
 -- | Upon first observing a snapshot, just continuously re-spend.
-ws.respendUtxo = do
+ws.respendUtxo : Text -> '{IO, Exception} ()
+ws.respendUtxo owningAddress = do
   Random.run do Threads.run do
     wsClient = do
       url = "http://localhost:4001/?history=no"
@@ -159,10 +149,11 @@ ws.respendUtxo = do
               None -> () -- Skip this message
 
               -- XXX: Use this to trigger sending an initial respend message.
-              Some (Left greetings) -> ()
+              Some (Left greetings) ->
+                printLine "Saw 'Greetings' ..."
 
               Some (Right snapshot) ->
-                signedTx = computeRespendTx snapshot ()
+                signedTx = computeRespendTx owningAddress snapshot ()
                 newTx = "{\"tag\": \"NewTx\", \"transaction\": " ++ signedTx ++ "}"
                 send ws (TextMessage newTx)
           BinaryMessage data -> ()
@@ -173,8 +164,38 @@ ws.respendUtxo = do
 > update
 ```
 
+## Entrypoint
+
+``` unison
+main = do
+  args = getArgs ()
+  addr = args |> head |> getOrBug ("Expected exactly one argument: the address that owns the UTxO to respend; got: " ++ toDebugText args)
+  printLine "Ready ..."
+  ws.respendUtxo addr ()
+```
+
+``` ucm
+> update
+```
+
 ## Build final binary
 
 ``` ucm
-> compile ws.respendUtxo respend-utxo
+> compile main respend-utxo
+```
+
+## Running
+
+
+This part isn't evaluated by ucm/unison; but if you now would like to run the
+resulting binary
+
+``` sh
+ucm run.compiled respend-utxo.uc addr_test1vp5cxztpc6hep9ds7fjgmle3l225tk8ske3rmwr9adu0m6qchmx5z
+```
+
+(Or, via Nix)
+
+``` sh
+nix run . --  addr_test1vp5cxztpc6hep9ds7fjgmle3l225tk8ske3rmwr9adu0m6qchmx5z
 ```

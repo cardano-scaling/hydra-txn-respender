@@ -1,8 +1,9 @@
 -- | Respend by issuing multiple HTTP requests. Note that because the
 -- 'transaction' endpoint returns before the Tx is accepted, this results in
--- failed posted transactions; but it still works.
-http.respendUtxo : '{IO, Exception} ()
-http.respendUtxo =
+-- failed posted transactions; but it still works. For this reason, though,
+-- it was not included in the transcript.
+http.respendUtxo : Text -> '{IO, Exception} ()
+http.respendUtxo owningAddress =
   do forever do
     s = Random.run do
           Threads.run do
@@ -10,7 +11,7 @@ http.respendUtxo =
               get (parseOrBug "http://localhost:4001/snapshot")
     e = Decoder.run envelopeFromJson (s |> bodyText)
 
-    signedTx = computeRespendTx (snapshot e) ()
+    signedTx = computeRespendTx owningAddress (snapshot e) ()
 
     Random.run do
       Threads.run do
