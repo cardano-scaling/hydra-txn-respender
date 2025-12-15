@@ -1,8 +1,8 @@
 ``` ucm :hide
-> install.lib @systemfw/concurrent
-> install.lib @unison/base
-> install.lib @unison/http
-> install.lib @unison/json
+> install.lib @systemfw/concurrent/releases/7.3.1
+> install.lib @unison/base/releases/7.8.3
+> install.lib @unison/http/releases/8.0.0
+> install.lib @unison/json/releases/1.3.5
 ```
 
 This is a "literate unison" script, that they call a
