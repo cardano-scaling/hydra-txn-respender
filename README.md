@@ -1,0 +1,54 @@
+# Transaction respender
+
+### Usage
+
+With, say, the demo environment from hydra-node:
+
+1. `nix run github:cardano-scaling/hydra#demo`.
+2. Open all the terminals, init the head, have everyone commit some monies
+3. Run `ucm run.file respend.u ws.respendUtxo`
+4. In one terminal, sign a new snapshot
+5. Observe many snapshots now signed.
+
+> [!Note]
+>
+> At present, you will need to change the address in
+> `transaction-respender.md` if you wish to run it in a different envrionment.
+
+
+### via Nix
+
+```
+nix run .
+```
+
+### Hacking
+
+You can load the transcript into a codebase created
+in the current folder like:
+
+```sh
+ucm transcript.in-place ./transaction-respender.md --codebase .
+```
+
+Then you can run:
+
+```sh
+ucm -c .
+> ls
+```
+
+And see the definitions.
+
+Note that, in typical Unison fashion, there is also a `scratch.u`. I have left
+in there a function to do the same respending over the HTTP endpoint (much
+slower, because we don't wait for Txn confirmations; so it submits failed
+Txns.)
+
+
+### Todo
+
+- [x] Keep both HTTP and WebSocket options
+- [x] Show how to use with `nix run .#demo`
+- [x] Unison dependencies
+- [ ] Configuration of arguments

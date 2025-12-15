@@ -1,0 +1,18 @@
+-- | Respend by issuing multiple HTTP requests. Note that because the
+-- 'transaction' endpoint returns before the Tx is accepted, this results in
+-- failed posted transactions; but it still works.
+http.respendUtxo : '{IO, Exception} ()
+http.respendUtxo =
+  do forever do
+    s = Random.run do
+          Threads.run do
+            Http.run do
+              get (parseOrBug "http://localhost:4001/snapshot")
+    e = Decoder.run envelopeFromJson (s |> bodyText)
+
+    signedTx = computeRespendTx (snapshot e) ()
+
+    Random.run do
+      Threads.run do
+        Http.run do
+          Http.post (parseOrBug "http://localhost:4001/transaction") (fromText signedTx)

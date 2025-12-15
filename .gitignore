@@ -1,0 +1,7 @@
+.direnv
+result
+.unisonHistory
+key.sk
+*.uc
+*.output.md
+.unison
