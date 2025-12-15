@@ -1,0 +1,132 @@
+main : '{IO, Exception} ()
+main = do
+  args = getArgs ()
+  addr = args |> List.head |> getOrBug ("Expected exactly one argument: the address that owns the UTxO to respend; got: " ++ toDebugText args)
+  printLine "Ready ..."
+  ws.respendUtxo addr ()
+
+
+-- | Upon first observing a snapshot, just continuously re-spend.
+ws.respendUtxo : Text -> '{IO, Exception} ()
+ws.respendUtxo owningAddress = do
+  Random.run do Threads.run do
+    wsClient = do
+      url = "http://localhost:4001/?history=no"
+      ws = HttpRequest.get (URI.parseOrBug url) |> webSocket
+      finalizer (_ -> close ws)
+      forever do
+        receive ws |> cases
+          TextMessage t ->
+            match Decoder.run greetingsOrSnapshotConfirmed t with
+              None -> () -- Skip this message
+
+              -- XXX: Use this to trigger sending an initial respend message.
+              Some (Left greetings) ->
+                printLine "Saw 'Greetings' ..."
+
+              Some (Right snapshot) ->
+                signedTx = computeRespendTx owningAddress snapshot ()
+                newTx = "{\"tag\": \"NewTx\", \"transaction\": " ++ signedTx ++ "}"
+                send ws (TextMessage newTx)
+          BinaryMessage data -> ()
+    handle wsClient () with client.HttpWebSocket.handler
+
+
+-- | Actual respend logic using cardano-cli.
+computeRespendTx : Text -> Snapshot -> '{IO, Exception} Text
+computeRespendTx owningAddress snapshot = do
+  (utxoRef, utxo) =
+    (filter (cases (id, utxo) -> address utxo == owningAddress) (toList <| utxos snapshot))
+      |> head
+      |> getOrBug "Couldn't find a UTxO for you"
+
+  txfile = "/tmp/txn-respender-new-tx.json"
+  signed = "/tmp/txn-respender-new-tx.signed.json"
+
+  -- 1. Make a new transaction
+  e1
+    = call "cardano-cli"
+        [ "latest", "transaction", "build-raw"
+        , "--tx-in"    , utxoRef
+        , "--tx-out"   , address utxo ++ "+" ++ (Nat.toText (value utxo))
+        , "--fee"      , "0"
+        , "--out-file" , txfile
+        ]
+
+  -- 2. Sign it
+  e2
+    = call "cardano-cli"
+        ["latest", "transaction", "sign"
+        , "--tx-body-file"     , txfile
+        , "--signing-key-file" , "key.sk"
+        , "--out-file"         , signed
+        ]
+
+  -- 3. Return signed contents
+  signedTx = readFileUtf8 (FilePath signed)
+  signedTx
+
+
+greetingsOrSnapshotConfirmed : '{Decoder} (Optional (Either Greetings Snapshot))
+greetingsOrSnapshotConfirmed
+  = do match at! "tag" text with
+      "Greetings"
+        -> g = greetingsFromJson ()
+           Some << Left <| g
+
+      "SnapshotConfirmed"
+        -> e = envelopeFromJson ()
+           Some << Right <| snapshot e
+
+      tag -> None
+
+
+-- Greetings
+
+type Greetings = {
+  hydraVersion: Text
+}
+
+greetingsFromJson : '{Decoder} Greetings
+greetingsFromJson = do
+  hydraVersion = at! "hydraNodeVersion" text
+  Greetings hydraVersion
+
+
+-- SnapshotConfirmed Envelope
+
+type Utxo = {
+  address: Text,
+  value: Nat
+}
+
+type Snapshot = {
+  number : Nat,
+  utxos : Map Text Utxo
+}
+
+type Envelope = {
+  snapshot : Snapshot
+}
+
+use object at!
+use Decoder text nat object
+
+envelopeFromJson : '{Decoder} Envelope
+envelopeFromJson = do
+  snapshot = at! "snapshot" snapshotFromJson
+  Envelope snapshot
+
+
+snapshotFromJson : '{Decoder} Snapshot
+snapshotFromJson = do
+  number = at! "number" nat
+  utxos  = at! "utxo" (object utxoFromJson)
+  Snapshot number utxos
+
+
+utxoFromJson : '{Decoder} Utxo
+utxoFromJson = do
+  address = at! "address" text
+  value   = at! "value" (do at! "lovelace" nat)
+  Utxo address value

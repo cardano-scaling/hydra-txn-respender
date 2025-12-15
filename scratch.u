@@ -17,3 +17,7 @@ http.respendUtxo owningAddress =
       Threads.run do
         Http.run do
           Http.post (parseOrBug "http://localhost:4001/transaction") (fromText signedTx)
+
+
+x = do
+  printLine (toDebugText 2)
