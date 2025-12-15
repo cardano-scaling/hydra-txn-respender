@@ -34,8 +34,13 @@ nix run .
 
 ### Hacking
 
-You can load the transcript into a codebase created
-in the current folder like:
+Create a codebase in this folder like:
+
+```sh
+ucm --codebase-create .
+```
+
+Then, you can load the transcript into this codebase like:
 
 ```sh
 ucm transcript.in-place ./transaction-respender.md --codebase .
