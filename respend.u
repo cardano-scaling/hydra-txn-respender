@@ -1,44 +1,88 @@
 main : '{IO, Exception} ()
 main = do
   args = getArgs ()
-  addr = args |> List.head |> getOrBug ("Expected exactly one argument: the address that owns the UTxO to respend; got: " ++ toDebugText args)
+  addr = args |> List.head |> getOrBug ("Expected at least one argument: the address that owns the UTxO to respend; got: " ++ toDebugText args)
+  maxRespends = List.at 1 args |> Optional.flatMap Nat.fromText
   printLine "Ready ..."
-  ws.respendUtxo addr ()
+  ws.respendUtxo addr maxRespends ()
 
 
--- | Upon first observing a snapshot, just continuously re-spend.
-ws.respendUtxo : Text -> '{IO, Exception} ()
-ws.respendUtxo owningAddress = do
+-- | Upon first observing a snapshot, just continuously re-spend. If
+-- 'maxRespends' is provided, each respend splits off a piece of size equal to
+-- the current 1-based iteration count (iter 1 splits off 1 lovelace, iter 2
+-- splits off 2 lovelace, etc.), and the program stops after that many splits.
+ws.respendUtxo : Text -> Optional Nat -> '{IO, Exception} ()
+ws.respendUtxo owningAddress maxRespends = do
   Random.run do Threads.run do
     wsClient = do
       url = "http://localhost:4001/?history=no"
       ws = HttpRequest.get (URI.parseOrBug url) |> webSocket
       finalizer (_ -> close ws)
-      forever do
-        receive ws |> cases
-          TextMessage t ->
-            match Decoder.run greetingsOrSnapshotConfirmed t with
-              None -> () -- Skip this message
-
-              -- XXX: Use this to trigger sending an initial respend message.
-              Some (Left greetings) ->
-                printLine "Saw 'Greetings' ..."
-
-              Some (Right snapshot) ->
-                signedTx = computeRespendTx owningAddress snapshot ()
-                newTx = "{\"tag\": \"NewTx\", \"transaction\": " ++ signedTx ++ "}"
-                send ws (TextMessage newTx)
-          BinaryMessage data -> ()
+      respendLoop owningAddress maxRespends ws 0
     handle wsClient () with client.HttpWebSocket.handler
 
 
--- | Actual respend logic using cardano-cli.
-computeRespendTx : Text -> Snapshot -> '{IO, Exception} Text
-computeRespendTx owningAddress snapshot = do
-  (utxoRef, utxo) =
-    (filter (cases (id, utxo) -> address utxo == owningAddress) (toList <| utxos snapshot))
-      |> head
-      |> getOrBug "Couldn't find a UTxO for you"
+respendLoop owningAddress maxRespends ws count =
+  reachedLimit = match maxRespends with
+    Some n -> count >= n
+    None   -> false
+  if reachedLimit then
+    printLine ("Reached max respends (" ++ Nat.toText count ++ "), stopping.")
+  else
+    -- When operating in split mode, split into bits of size 1.
+    splitAmount = match maxRespends with
+      None   -> None
+      -- Note: Making this an amount we can definitely fan out.
+      Some _ -> Some (1000000 Nat.* (count + 1))
+    newCount = receive ws |> cases
+      TextMessage t ->
+        match Decoder.run greetingsOrSnapshotConfirmed t with
+          None -> count -- Skip this message
+
+          -- XXX: Use this to trigger sending an initial respend message.
+          Some (Left greetings) ->
+            printLine "Saw 'Greetings' ..."
+            count
+
+          Some (Right snapshot) ->
+            signedTx = computeRespendTx owningAddress splitAmount snapshot ()
+            newTx = "{\"tag\": \"NewTx\", \"transaction\": " ++ signedTx ++ "}"
+            send ws (TextMessage newTx)
+            count + 1
+      BinaryMessage data -> count
+    respendLoop owningAddress maxRespends ws newCount
+
+
+-- | Pick the larger of two (ref, utxo) pairs by lovelace value.
+largerUtxo : (Text, Utxo) -> (Text, Utxo) -> (Text, Utxo)
+largerUtxo a b =
+  (_, ua) = a
+  (_, ub) = b
+  if Nat.gt (value ua) (value ub) then a else b
+
+
+-- | Actual respend logic using cardano-cli. If 'splitAmount' is 'Some k', the
+-- transaction has two outputs: one of 'k' lovelace, and the remainder. We
+-- always select the largest matching UTxO so that the small split-off pieces
+-- don't get re-selected as the next input.
+computeRespendTx : Text -> Optional Nat -> Snapshot -> '{IO, Exception} Text
+computeRespendTx owningAddress splitAmount snapshot = do
+  myUtxos =
+    filter (cases (id, utxo) -> address utxo == owningAddress) (toList <| utxos snapshot)
+  (utxoRef, utxo) = match myUtxos with
+    []            -> bug "Couldn't find a UTxO for you"
+    first +: rest -> List.foldLeft largerUtxo first rest
+
+  outArgs = match splitAmount with
+    Some k ->
+      remainder =
+        if Nat.gt (value utxo) k then Nat.diff (value utxo) k
+        else bug ("UTxO value " ++ Nat.toText (value utxo) ++ " is too small to split off " ++ Nat.toText k)
+      [ "--tx-out", address utxo ++ "+" ++ Nat.toText k
+      , "--tx-out", address utxo ++ "+" ++ Nat.toText remainder
+      ]
+    None ->
+      [ "--tx-out", address utxo ++ "+" ++ Nat.toText (value utxo) ]
 
   txfile = "/tmp/txn-respender-new-tx.json"
   signed = "/tmp/txn-respender-new-tx.signed.json"
@@ -46,12 +90,11 @@ computeRespendTx owningAddress snapshot = do
   -- 1. Make a new transaction
   e1
     = call "cardano-cli"
-        [ "latest", "transaction", "build-raw"
-        , "--tx-in"    , utxoRef
-        , "--tx-out"   , address utxo ++ "+" ++ (Nat.toText (value utxo))
-        , "--fee"      , "0"
-        , "--out-file" , txfile
-        ]
+        (List.join
+          [ ["latest", "transaction", "build-raw", "--tx-in", utxoRef]
+          , outArgs
+          , ["--fee", "0", "--out-file", txfile]
+          ])
 
   -- 2. Sign it
   e2
